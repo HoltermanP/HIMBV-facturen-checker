@@ -99,9 +99,14 @@ export default function Home() {
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '20px 16px 60px' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ fontSize: 22, margin: 0 }}>Bonnen &amp; Facturen</h1>
-        <button onClick={() => setShowSettings((s) => !s)} style={btnGhost}>
-          Instellingen
-        </button>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <a href="/check" style={{ ...btnGhost, textDecoration: 'none' }}>
+            Controle
+          </a>
+          <button onClick={() => setShowSettings((s) => !s)} style={btnGhost}>
+            Instellingen
+          </button>
+        </div>
       </header>
       <p style={{ color: '#5b6470', marginTop: 6 }}>
         Stuur een bon of factuur door naar Basecone. Foto maken, of bestanden uploaden.

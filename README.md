@@ -33,15 +33,20 @@ Basecone geaccepteerd. De app probeert daarna een kopie in je **Verzonden-map** 
 ## Architectuur
 
 ```
-app/page.jsx          Webclient: drag-and-drop, bestand kiezen, foto maken
-app/api/intake        POST multipart -> per file de pipeline (handmatig)
-app/api/poll-mail     GET via cron -> ongelezen mail uit INTAKE_FOLDER -> pipeline
-lib/mail.js           SMTP versturen + IMAP ophalen/markeren als gelezen
-lib/ocr.js            OpenAI vision -> {amount, vat, vendor, doc_date}
-lib/db.js             Neon: logDocument (idempotent), seenMessage, recentDocuments
-lib/process.js        Gedeelde pipeline + isProcessable-filter
-db/schema.sql         Tabel documents + indexen
-vercel.json           Cron: 0 7 * * * (dagelijks; Hobby-plan staat niet vaker toe)
+app/page.jsx               Webclient: drag-and-drop, bestand kiezen, foto maken
+app/check/page.jsx         Volledigheidscontrole: CSV-afschrift uploaden + rapport
+app/api/intake             POST multipart -> per file de pipeline (handmatig)
+app/api/poll-mail          GET via cron -> ongelezen mail uit INTAKE_FOLDER -> pipeline
+app/api/transactions/import POST CSV -> transacties opslaan + matchen
+app/api/report             GET -> uitgaven zonder bon + bonnen zonder transactie
+lib/mail.js                SMTP versturen + IMAP ophalen/markeren als gelezen
+lib/ocr.js                 OpenAI vision -> {amount, vat, vendor, doc_date}
+lib/db.js                  Neon: documenten + transacties + matching-queries
+lib/process.js             Gedeelde pipeline + isProcessable-filter
+lib/bankcsv.js             Flexibele bankafschrift-CSV-parser
+lib/match.js               Matching transacties <-> bonnen (bedrag + datum ±7d)
+db/schema.sql              Tabellen documents + transactions + indexen
+vercel.json                Cron: 0 7 * * * (dagelijks; Hobby-plan staat niet vaker toe)
 ```
 
 **Idempotentie bij mail.** Per bijlage is de sleutel
@@ -165,6 +170,16 @@ in de cron-definitie. Voor handmatig testen gebruik je `CRON_SECRET`.
 - Auth: `Authorization: Bearer <CRON_SECRET>` **óf** header `x-vercel-cron` (Vercel).
 - Antwoord: `{ processed, skipped, errors, detail }`.
 
+### `POST /api/transactions/import` (volledigheidscontrole)
+- Auth: `Authorization: Bearer <INTAKE_SECRET>`
+- Body: `multipart/form-data` met veld `file` (een bankafschrift-CSV).
+- Slaat transacties idempotent op (op fingerprint) en draait daarna de matching.
+- Antwoord: `{ status, parsed, imported, duplicates, matched, warnings }`.
+
+### `GET /api/report` (volledigheidscontrole)
+- Auth: `Authorization: Bearer <INTAKE_SECRET>`
+- Antwoord: `{ missing, docsWithout, counts }` — uitgaven zonder bon en bonnen zonder transactie.
+
 **Handmatige test-curl voor de poll:**
 
 ```bash
@@ -190,6 +205,20 @@ curl -i "https://<jouw-app>.vercel.app/api/intake" \
 - [x] Laptop-upload van 2 PDF's → 2 mails naar Basecone + 2 rijen in Neon.
 - [x] Doorgestuurde mail met 1 PDF wordt binnen één cron-run verwerkt en als gelezen
       gemarkeerd; opnieuw draaien geeft geen dubbele registratie.
+
+## Volledigheidscontrole (bankafschrift)
+
+Ga naar **`/check`** (link "Controle" op de hoofdpagina):
+
+1. Upload een **bankafschrift als CSV** (export uit je bank). De parser herkent automatisch
+   het scheidingsteken en de kolommen (datum, bedrag, tegenpartij, omschrijving) en de
+   NL-bedragnotatie. Her-uploaden geeft geen dubbele regels (idempotent op fingerprint).
+2. Elke **uitgave** wordt gekoppeld aan een geregistreerde bon op **bedrag (exact) + datum
+   (±7 dagen)**; een leveranciersnaam die op de tegenpartij lijkt is een tiebreaker.
+3. Het rapport toont **uitgaven zonder bon** (de gaten) en **bonnen zonder transactie**.
+
+> Matching is één-op-één: een bon wordt aan hooguit één transactie gekoppeld. Alleen
+> uitgaven (negatieve bedragen) hoeven een bon te hebben; bijschrijvingen worden genegeerd.
 
 ## Opmerkingen
 
