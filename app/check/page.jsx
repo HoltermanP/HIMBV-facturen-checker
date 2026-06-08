@@ -49,7 +49,7 @@ export default function Check() {
     if (!secret) return;
     setError(null);
     try {
-      const res = await fetch('/api/report', { headers: { authorization: `Bearer ${secret}` } });
+      const res = await fetch('/api/report', { headers: { authorization: `Bearer ${secret}` }, cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setError(data.error || `Rapport faalde (${res.status})`);
       else setReport(data);
