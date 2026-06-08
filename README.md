@@ -26,7 +26,7 @@ Basecone geaccepteerd. De app probeert daarna een kopie in je **Verzonden-map** 
 - `nodemailer` (SMTP versturen) + `imapflow` (IMAP ophalen)
 - OpenAI `gpt-4o-mini` met vision voor OCR
 - Neon (`@neondatabase/serverless`)
-- Deploy op Vercel, mailbox-poll via Vercel Cron (elke 15 min)
+- Deploy op Vercel, mailbox-poll via Vercel Cron (dagelijks op Hobby; vaker met externe cron of Pro)
 
 ---
 
@@ -41,7 +41,7 @@ lib/ocr.js            OpenAI vision -> {amount, vat, vendor, doc_date}
 lib/db.js             Neon: logDocument (idempotent), seenMessage, recentDocuments
 lib/process.js        Gedeelde pipeline + isProcessable-filter
 db/schema.sql         Tabel documents + indexen
-vercel.json           Cron: */15 * * * *
+vercel.json           Cron: 0 7 * * * (dagelijks; Hobby-plan staat niet vaker toe)
 ```
 
 **Idempotentie bij mail.** Per bijlage is de sleutel
@@ -120,9 +120,18 @@ npm run build      # moet slagen
 vercel             # of koppel de repo in het Vercel-dashboard
 ```
 
-`vercel.json` registreert de cron automatisch (`*/15 * * * *`). Vercel stuurt bij elke
-cron-run de header `x-vercel-cron`, dus `/api/poll-mail` werkt zonder dat je een token
-hoeft te configureren in de cron-definitie. Voor handmatig testen gebruik je `CRON_SECRET`.
+`vercel.json` registreert de cron automatisch. Vercel stuurt bij elke cron-run de header
+`x-vercel-cron`, dus `/api/poll-mail` werkt zonder dat je een token hoeft te configureren
+in de cron-definitie. Voor handmatig testen gebruik je `CRON_SECRET`.
+
+> **Hobby-plan: max. 1× per dag.** Op het gratis Vercel-plan mag een cron maar één keer
+> per dag draaien; daarom staat de schedule op `0 7 * * *` (07:00 UTC). Wil je vaker
+> ophalen (bijv. elk kwartier), dan zijn er twee opties:
+>
+> 1. **Externe cron-service** (gratis, aanbevolen): laat bijv. [cron-job.org] elke 15 min
+>    een GET doen naar `https://<jouw-app>.vercel.app/api/poll-mail` met header
+>    `Authorization: Bearer <CRON_SECRET>`. De route accepteert deze auth gewoon.
+> 2. **Upgrade naar Vercel Pro** en zet de schedule terug op `*/15 * * * *`.
 
 > Let op: SMTP/IMAP gebruiken uitgaande TCP-verbindingen. Dat werkt op Vercel met de
 > Node.js-runtime (al ingesteld via `runtime = 'nodejs'`).
