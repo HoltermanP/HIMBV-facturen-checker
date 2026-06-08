@@ -211,9 +211,10 @@ curl -i "https://<jouw-app>.vercel.app/api/intake" \
 Ga naar **`/check`** (link "Controle" op de hoofdpagina):
 
 1. Upload een **bankafschrift als CSV of TAB-bestand** (export uit je bank). De parser
-   herkent automatisch het scheidingsteken (komma, puntkomma of **tab**) en de kolommen
-   (datum, bedrag, tegenpartij, omschrijving) en de NL-bedragnotatie. Her-uploaden geeft
-   geen dubbele regels (idempotent op fingerprint).
+   herkent automatisch het scheidingsteken (komma, puntkomma of **tab**), CSV's mét
+   kopregel, én het **kolom-vaste ABN AMRO TAB-formaat** (zonder koppen, met `/NAME/` en
+   `/REMI/` in het omschrijvingsveld). Her-uploaden geeft geen dubbele regels (idempotent
+   op fingerprint).
 2. Elke **uitgave** wordt gekoppeld aan een geregistreerde bon op **bedrag (exact) + datum
    (±7 dagen)**; een leveranciersnaam die op de tegenpartij lijkt is een tiebreaker.
 3. Het rapport toont **uitgaven zonder bon** (de gaten) en **bonnen zonder transactie**.
