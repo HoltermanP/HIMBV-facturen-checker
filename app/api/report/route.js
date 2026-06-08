@@ -1,12 +1,12 @@
 // Volledigheidsrapport. Bearer-auth op INTAKE_SECRET.
-// Geeft openstaande uitgaven (met status), 'geen bon nodig'-lijst, bonnen zonder
-// transactie, alle boekingen, en tellingen voor de statistiekblokken.
+// Openstaande posten (beide richtingen, met status), 'geen document nodig'-lijst,
+// bonnen zonder transactie, alle boekingen, en tellingen voor de statistiekblokken.
 import {
-  openExpenses,
-  noneNeededExpenses,
+  openItems,
+  noneNeededItems,
   documentsWithoutTransaction,
   allTransactions,
-  expenseStatusCounts,
+  itemStatusCounts,
 } from '../../../lib/db.js';
 
 export const runtime = 'nodejs';
@@ -20,27 +20,29 @@ export async function GET(req) {
     return json({ error: 'unauthorized' }, 401);
   }
 
-  const [expenses, noneNeeded, docsWithout, all, counts] = await Promise.all([
-    openExpenses(),
-    noneNeededExpenses(),
+  const [items, noneNeeded, docsWithout, all, counts] = await Promise.all([
+    openItems(),
+    noneNeededItems(),
     documentsWithoutTransaction(),
     allTransactions(),
-    expenseStatusCounts(),
+    itemStatusCounts(),
   ]);
 
   return json(
     {
-      expenses,
+      items,
       noneNeeded,
       docsWithout,
       all,
       counts: {
-        open: counts.open,
+        openOut: counts.open_out,
+        openIn: counts.open_in,
         suggested: counts.suggested,
         noneNeeded: counts.none_needed,
         matched: counts.matched,
         docsWithout: docsWithout.length,
-        openTotal: Math.round(Number(counts.open_total) * 100) / 100,
+        outTotal: Math.round(Number(counts.out_total) * 100) / 100,
+        inTotal: Math.round(Number(counts.in_total) * 100) / 100,
       },
     },
     200,

@@ -9,6 +9,7 @@
   --green-bg: #ecfdf3; --green-fg: #027a48;
   --amber-bg: #fffaeb; --amber-fg: #b54708;
   --blue-bg: #eff8ff; --blue-fg: #175cd3;
+  --purple-bg: #f4f3ff; --purple-fg: #5925dc;
   --gray-bg: #f2f4f7; --gray-fg: #475467;
   --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
 }
@@ -68,6 +69,7 @@ body {
 .stat.amber { background: var(--amber-bg); border-color: #fedf89; color: var(--amber-fg); }
 .stat.blue { background: var(--blue-bg); border-color: #b2ddff; color: var(--blue-fg); }
 .stat.green { background: var(--green-bg); border-color: #a6f4c5; color: var(--green-fg); }
+.stat.purple { background: var(--purple-bg); border-color: #d9d6fe; color: var(--purple-fg); }
 .stat.gray { background: var(--gray-bg); border-color: var(--border); color: var(--gray-fg); }
 
 /* Tabel */
@@ -92,6 +94,7 @@ table.tbl tbody tr:hover { background: #fafbfc; }
 .badge.green { background: var(--green-bg); color: var(--green-fg); }
 .badge.amber { background: var(--amber-bg); color: var(--amber-fg); }
 .badge.blue { background: var(--blue-bg); color: var(--blue-fg); }
+.badge.purple { background: var(--purple-bg); color: var(--purple-fg); }
 .badge.gray { background: var(--gray-bg); color: var(--gray-fg); }
 
 .section-title { font-size: 17px; font-weight: 650; margin: 30px 0 12px; }

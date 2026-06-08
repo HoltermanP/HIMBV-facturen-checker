@@ -129,20 +129,20 @@ export default function Check() {
       {c && (
         <div className="stats">
           <div className="stat amber">
-            <div className="num">{c.open}</div>
-            <div className="lbl">Bon ophalen{c.openTotal ? ` · € ${fmt(c.openTotal)}` : ''}</div>
+            <div className="num">{c.openOut}</div>
+            <div className="lbl">Bon ophalen (inkoop){c.outTotal ? ` · € ${fmt(c.outTotal)}` : ''}</div>
+          </div>
+          <div className="stat purple">
+            <div className="num">{c.openIn}</div>
+            <div className="lbl">Factuur ontbreekt (verkoop){c.inTotal ? ` · € ${fmt(c.inTotal)}` : ''}</div>
           </div>
           <div className="stat blue">
             <div className="num">{c.suggested}</div>
-            <div className="lbl">Ter goedkeuring (geen bon?)</div>
+            <div className="lbl">Ter goedkeuring (geen document?)</div>
           </div>
           <div className="stat green">
             <div className="num">{c.matched}</div>
-            <div className="lbl">Bon gekoppeld</div>
-          </div>
-          <div className="stat gray">
-            <div className="num">{c.docsWithout}</div>
-            <div className="lbl">Bonnen zonder transactie</div>
+            <div className="lbl">Document gekoppeld</div>
           </div>
         </div>
       )}
@@ -151,7 +151,7 @@ export default function Check() {
       {report && (
         <div className="tabs" style={{ marginBottom: 18 }}>
           <button className={`tab ${tab === 'open' ? 'active' : ''}`} onClick={() => setTab('open')}>
-            Openstaand{c ? ` (${c.open + c.suggested})` : ''}
+            Openstaand{c ? ` (${c.openOut + c.openIn + c.suggested})` : ''}
           </button>
           <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
             Alle boekingen{report.all ? ` (${report.all.length})` : ''}
@@ -170,54 +170,64 @@ export default function Check() {
 // --- Tab: openstaande uitgaven + terugdraai-sectie ------------------------
 
 function OpenTab({ report, resolve, pendingId }) {
-  const expenses = report.expenses || [];
+  const items = report.items || [];
   const noneNeeded = report.noneNeeded || [];
   const docsWithout = report.docsWithout || [];
 
   return (
     <>
-      <h2 className="section-title">Uitgaven zonder bon</h2>
-      {expenses.length === 0 ? (
-        <div className="empty">✓ Alles afgehandeld — geen openstaande uitgaven.</div>
+      <h2 className="section-title">Openstaande posten</h2>
+      <p className="subtitle" style={{ marginTop: -4, marginBottom: 12 }}>
+        Uitgaven hebben een <b>inkoopbon</b> nodig, bijschrijvingen een <b>uitgaande factuur</b>.
+      </p>
+      {items.length === 0 ? (
+        <div className="empty">✓ Alles afgehandeld — geen openstaande posten.</div>
       ) : (
         <div className="table-wrap">
           <table className="tbl">
             <colgroup>
               <col style={{ width: 104 }} />
-              <col style={{ width: 116 }} />
+              <col style={{ width: 120 }} />
               <col style={{ width: '24%' }} />
               <col />
-              <col style={{ width: 260 }} />
+              <col style={{ width: 270 }} />
             </colgroup>
             <thead>
               <tr>
                 <th>Datum</th><th style={{ textAlign: 'right' }}>Bedrag</th>
-                <th>Tegenpartij</th><th>Omschrijving</th><th>Actie</th>
+                <th>Tegenpartij</th><th>Omschrijving</th><th>Nodig / actie</th>
               </tr>
             </thead>
             <tbody>
-              {expenses.map((t) => {
+              {items.map((t) => {
                 const sug = t.receipt_status === 'suggested_none';
                 const wait = pendingId === t.id;
+                const isOut = Number(t.amount) < 0;
+                const docWord = isOut ? 'bon' : 'factuur'; // inkoopbon vs uitgaande factuur
                 return (
                   <tr key={t.id} className={sug ? 'row-suggested' : ''}>
                     <td className="nowrap">{t.tx_date}</td>
-                    <td className="num-cell amount-out">€ {fmt(Math.abs(Number(t.amount)))}</td>
+                    <td className={`num-cell ${isOut ? 'amount-out' : 'amount-in'}`}>
+                      {isOut ? '−' : '+'} € {fmt(Math.abs(Number(t.amount)))}
+                    </td>
                     <td className="wrap">{t.counterparty || <span className="muted">—</span>}</td>
                     <td className="wrap">{t.description || <span className="muted">—</span>}</td>
                     <td>
                       {sug ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <span className="badge amber">voorgesteld: geen bon</span>
+                          <span className="badge amber">voorgesteld: geen {docWord}</span>
                           <div className="actions">
                             <button className="btn btn-primary btn-sm" disabled={wait} onClick={() => resolve(t.id, 'none_needed')}>Akkoord</button>
-                            <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'open')}>Toch bon nodig</button>
+                            <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'open')}>Toch {docWord} nodig</button>
                           </div>
                         </div>
                       ) : (
-                        <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'none_needed')}>
-                          ✓ Geen bon nodig
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <span className={`badge ${isOut ? 'amber' : 'purple'}`}>{isOut ? 'inkoopbon nodig' : 'verkoopfactuur nodig'}</span>
+                          <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'none_needed')}>
+                            ✓ Geen {docWord} nodig
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -230,7 +240,7 @@ function OpenTab({ report, resolve, pendingId }) {
 
       {noneNeeded.length > 0 && (
         <>
-          <h2 className="section-title">Gemarkeerd als “geen bon nodig” ({noneNeeded.length})</h2>
+          <h2 className="section-title">Gemarkeerd als “geen document nodig” ({noneNeeded.length})</h2>
           <div className="table-wrap">
             <table className="tbl">
               <colgroup>
@@ -241,19 +251,24 @@ function OpenTab({ report, resolve, pendingId }) {
                 <tr><th>Datum</th><th style={{ textAlign: 'right' }}>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Actie</th></tr>
               </thead>
               <tbody>
-                {noneNeeded.map((t) => (
-                  <tr key={t.id}>
-                    <td className="nowrap">{t.tx_date}</td>
-                    <td className="num-cell amount-out">€ {fmt(Math.abs(Number(t.amount)))}</td>
-                    <td className="wrap">{t.counterparty || <span className="muted">—</span>}</td>
-                    <td className="wrap">{t.description || <span className="muted">—</span>}</td>
-                    <td>
-                      <button className="btn btn-danger-ghost btn-sm" disabled={pendingId === t.id} onClick={() => resolve(t.id, 'open')}>
-                        Terugzetten
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {noneNeeded.map((t) => {
+                  const isOut = Number(t.amount) < 0;
+                  return (
+                    <tr key={t.id}>
+                      <td className="nowrap">{t.tx_date}</td>
+                      <td className={`num-cell ${isOut ? 'amount-out' : 'amount-in'}`}>
+                        {isOut ? '−' : '+'} € {fmt(Math.abs(Number(t.amount)))}
+                      </td>
+                      <td className="wrap">{t.counterparty || <span className="muted">—</span>}</td>
+                      <td className="wrap">{t.description || <span className="muted">—</span>}</td>
+                      <td>
+                        <button className="btn btn-danger-ghost btn-sm" disabled={pendingId === t.id} onClick={() => resolve(t.id, 'open')}>
+                          Terugzetten
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -325,11 +340,12 @@ function AllTab({ rows }) {
 }
 
 function bonBadge(t) {
-  if (t.matched_doc_id) return <span className="badge green">● bon gekoppeld</span>;
-  if (Number(t.amount) >= 0) return <span className="badge gray">bijschrijving</span>;
-  if (t.receipt_status === 'none_needed') return <span className="badge gray">geen bon nodig</span>;
-  if (t.receipt_status === 'suggested_none') return <span className="badge blue">geen bon?</span>;
-  return <span className="badge amber">bon nodig</span>;
+  const isOut = Number(t.amount) < 0;
+  const docWord = isOut ? 'bon' : 'factuur';
+  if (t.matched_doc_id) return <span className="badge green">● document gekoppeld</span>;
+  if (t.receipt_status === 'none_needed') return <span className="badge gray">geen {docWord} nodig</span>;
+  if (t.receipt_status === 'suggested_none') return <span className="badge blue">geen {docWord}?</span>;
+  return <span className={`badge ${isOut ? 'amber' : 'purple'}`}>{isOut ? 'inkoopbon nodig' : 'verkoopfactuur nodig'}</span>;
 }
 
 function fmt(n) {

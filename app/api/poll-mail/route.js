@@ -2,9 +2,12 @@
 // verwerkt elke bijlage en markeert het bericht daarna als gelezen.
 import { fetchUnreadWithAttachments, markReadUids } from '../../../lib/mail.js';
 import { processAttachment, isProcessable } from '../../../lib/process.js';
+import { runMatching } from '../../../lib/match.js';
+import { classifyByRules } from '../../../lib/db.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(req) {
   // Auth: Bearer CRON_SECRET OF de door Vercel Cron gezette header x-vercel-cron.
@@ -75,6 +78,14 @@ export async function GET(req) {
     await markReadUids(folder, readyUids);
   } catch (err) {
     detail.push({ status: 'warn', error: `markRead faalde: ${String(err.message || err)}` });
+  }
+
+  // Opgehaalde facturen meteen proberen te koppelen aan banktransacties.
+  if (processed > 0) {
+    try {
+      await runMatching();
+      await classifyByRules();
+    } catch { /* koppelen mag de poll niet laten falen */ }
   }
 
   return json({ processed, skipped, errors, detail }, 200);

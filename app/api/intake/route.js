@@ -1,8 +1,11 @@
 // Handmatige intake: foto vanaf iPhone of upload(s) vanaf laptop.
 // POST multipart/form-data met één of meer velden "file". Bearer-auth op INTAKE_SECRET.
 import { processAttachment, isProcessable } from '../../../lib/process.js';
+import { runMatching } from '../../../lib/match.js';
+import { classifyByRules } from '../../../lib/db.js';
 
 export const runtime = 'nodejs';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req) {
   // Auth: Bearer INTAKE_SECRET.
@@ -57,6 +60,16 @@ export async function POST(req) {
     } catch (err) {
       anyFail = true;
       results.push({ filename, status: 'error', error: String(err.message || err), vendor: null, amount: null, doc_date: null });
+    }
+  }
+
+  // Na het verwerken meteen proberen te koppelen aan bestaande banktransacties.
+  if (results.some((r) => r.status === 'sent' || r.status === 'registered')) {
+    try {
+      await runMatching();
+      await classifyByRules();
+    } catch {
+      // koppelen mag de upload niet laten falen
     }
   }
 
