@@ -78,10 +78,10 @@ export default function Check() {
 
       <section style={card}>
         <label style={btnPrimary}>
-          {busy ? 'Bezig…' : '📄 Bankafschrift (CSV) kiezen'}
+          {busy ? 'Bezig…' : '📄 Bankafschrift (CSV/TAB) kiezen'}
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.tab,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
             disabled={busy}
             style={{ display: 'none' }}
             onChange={(e) => {
