@@ -219,6 +219,16 @@ Ga naar **`/check`** (link "Controle" op de hoofdpagina):
    (±7 dagen)**; een leveranciersnaam die op de tegenpartij lijkt is een tiebreaker.
 3. Het rapport toont **uitgaven zonder bon** (de gaten) en **bonnen zonder transactie**.
 
+**Afvinken + zelflerend.** Bij een uitgave waar geen bon bij hoort klik je **"Geen bon
+nodig"**. Daarna worden gelijksoortige betalingen (zelfde tegenpartij) automatisch
+**voorgesteld** als "geen bon" — zowel de openstaande nu als bij volgende imports. Een
+voorstel keur je goed (**Akkoord**) of zet je terug (**Toch bon nodig**). Een afgevinkte
+uitgave kun je altijd **terugzetten**. Zo werk je de lijst leeg.
+
+**Alle boekingen.** Het tweede tabblad toont álle transacties met per regel of er een bon
+aan gekoppeld is: *bon gekoppeld*, *bon nodig*, *geen bon (voorgesteld/nodig)* of
+*bijschrijving*.
+
 > Matching is één-op-één: een bon wordt aan hooguit één transactie gekoppeld. Alleen
 > uitgaven (negatieve bedragen) hoeven een bon te hebben; bijschrijvingen worden genegeerd.
 

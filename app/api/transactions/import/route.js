@@ -1,11 +1,12 @@
 // Import van een bankafschrift (CSV). Bearer-auth op INTAKE_SECRET.
 // Parseert de CSV, slaat transacties idempotent op en draait daarna de matching.
 import { parseBankCsv } from '../../../../lib/bankcsv.js';
-import { insertTransaction } from '../../../../lib/db.js';
+import { insertTransaction, classifyByRules } from '../../../../lib/db.js';
 import { runMatching } from '../../../../lib/match.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req) {
   const auth = req.headers.get('authorization') || '';
@@ -42,8 +43,9 @@ export async function POST(req) {
     else duplicates++;
   }
 
-  // Na import meteen koppelen aan bestaande bonnen.
+  // Na import meteen koppelen aan bestaande bonnen, daarna 'geen bon'-regels toepassen.
   const matched = await runMatching();
+  await classifyByRules();
 
   return json(
     {

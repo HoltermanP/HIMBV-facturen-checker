@@ -37,5 +37,9 @@ create table if not exists transactions (
   created_at     timestamptz not null default now()
 );
 
-create index if not exists transactions_tx_date_idx on transactions (tx_date);
-create index if not exists transactions_amount_idx  on transactions (amount);
+-- receipt_status: 'open' (bon nodig) | 'suggested_none' (voorgesteld: geen bon) | 'none_needed' (geen bon nodig)
+alter table transactions add column if not exists receipt_status text not null default 'open';
+
+create index if not exists transactions_tx_date_idx        on transactions (tx_date);
+create index if not exists transactions_amount_idx         on transactions (amount);
+create index if not exists transactions_receipt_status_idx on transactions (receipt_status);

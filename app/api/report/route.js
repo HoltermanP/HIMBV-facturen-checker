@@ -1,6 +1,13 @@
 // Volledigheidsrapport. Bearer-auth op INTAKE_SECRET.
-// Geeft de "gaten" terug: uitgaven zonder bon, en bonnen zonder transactie.
-import { missingReceipts, documentsWithoutTransaction } from '../../../lib/db.js';
+// Geeft openstaande uitgaven (met status), 'geen bon nodig'-lijst, bonnen zonder
+// transactie, alle boekingen, en tellingen voor de statistiekblokken.
+import {
+  openExpenses,
+  noneNeededExpenses,
+  documentsWithoutTransaction,
+  allTransactions,
+  expenseStatusCounts,
+} from '../../../lib/db.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,20 +20,27 @@ export async function GET(req) {
     return json({ error: 'unauthorized' }, 401);
   }
 
-  const missing = await missingReceipts();
-  const docsWithout = await documentsWithoutTransaction();
-
-  // Totaalbedrag van de ontbrekende bonnen (uitgaven zijn negatief).
-  const missingTotal = missing.reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+  const [expenses, noneNeeded, docsWithout, all, counts] = await Promise.all([
+    openExpenses(),
+    noneNeededExpenses(),
+    documentsWithoutTransaction(),
+    allTransactions(),
+    expenseStatusCounts(),
+  ]);
 
   return json(
     {
-      missing,
+      expenses,
+      noneNeeded,
       docsWithout,
+      all,
       counts: {
-        missing: missing.length,
+        open: counts.open,
+        suggested: counts.suggested,
+        noneNeeded: counts.none_needed,
+        matched: counts.matched,
         docsWithout: docsWithout.length,
-        missingTotal: Math.round(missingTotal * 100) / 100,
+        openTotal: Math.round(Number(counts.open_total) * 100) / 100,
       },
     },
     200,
@@ -34,8 +48,5 @@ export async function GET(req) {
 }
 
 function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
