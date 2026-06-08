@@ -156,6 +156,9 @@ export default function Check() {
           <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
             Alle boekingen{report.all ? ` (${report.all.length})` : ''}
           </button>
+          <button className={`tab ${tab === 'vat' ? 'active' : ''}`} onClick={() => setTab('vat')}>
+            BTW per maand
+          </button>
         </div>
       )}
 
@@ -163,6 +166,7 @@ export default function Check() {
         <OpenTab report={report} resolve={resolve} pendingId={pendingId} />
       )}
       {report && tab === 'all' && <AllTab rows={report.all || []} />}
+      {report && tab === 'vat' && <VatTab months={report.vat || []} />}
     </main>
   );
 }
@@ -346,6 +350,70 @@ function bonBadge(t) {
   if (t.receipt_status === 'none_needed') return <span className="badge gray">geen {docWord} nodig</span>;
   if (t.receipt_status === 'suggested_none') return <span className="badge blue">geen {docWord}?</span>;
   return <span className={`badge ${isOut ? 'amber' : 'purple'}`}>{isOut ? 'inkoopbon nodig' : 'verkoopfactuur nodig'}</span>;
+}
+
+// --- Tab: BTW per maand ---------------------------------------------------
+
+function VatTab({ months }) {
+  if (!months.length) {
+    return <div className="empty">Nog geen boekingen om BTW over te berekenen.</div>;
+  }
+  const tot = months.reduce(
+    (a, m) => ({ output: a.output + m.output, input: a.input + m.input, reserve: a.reserve + m.reserve, estimated: a.estimated + m.estimated }),
+    { output: 0, input: 0, reserve: 0, estimated: 0 },
+  );
+  return (
+    <>
+      <p className="subtitle" style={{ marginTop: 0, marginBottom: 12 }}>
+        Per maand op basis van de boekingen. Echte BTW van de gekoppelde bon waar aanwezig,
+        anders een <b>21%-schatting</b>; posten “geen document nodig” tellen als 0%.
+      </p>
+      <div className="table-wrap">
+        <table className="tbl">
+          <colgroup>
+            <col style={{ width: 130 }} /><col /><col /><col /><col style={{ width: 150 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Maand</th>
+              <th style={{ textAlign: 'right' }}>Af te dragen (verkoop)</th>
+              <th style={{ textAlign: 'right' }}>Terug te vorderen (inkoop)</th>
+              <th style={{ textAlign: 'right' }}>Te reserveren</th>
+              <th style={{ textAlign: 'right' }}>waarvan geschat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((m) => (
+              <tr key={m.month}>
+                <td className="nowrap"><b>{maand(m.month)}</b></td>
+                <td className="num-cell">€ {fmt(m.output)}</td>
+                <td className="num-cell">€ {fmt(m.input)}</td>
+                <td className="num-cell" style={{ color: m.reserve >= 0 ? '#b54708' : '#027a48' }}>€ {fmt(m.reserve)}</td>
+                <td className="num-cell muted">{m.estimated ? `€ ${fmt(m.estimated)}` : '—'}</td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: '2px solid #e5e7eb' }}>
+              <td className="nowrap"><b>Totaal</b></td>
+              <td className="num-cell"><b>€ {fmt(tot.output)}</b></td>
+              <td className="num-cell"><b>€ {fmt(tot.input)}</b></td>
+              <td className="num-cell"><b>€ {fmt(tot.reserve)}</b></td>
+              <td className="num-cell muted">{tot.estimated ? `€ ${fmt(tot.estimated)}` : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="note">
+        “Te reserveren” = af te dragen − terug te vorderen. Hoe meer bonnen je koppelt, hoe
+        kleiner het geschatte deel en hoe nauwkeuriger het bedrag.
+      </div>
+    </>
+  );
+}
+
+const MAANDEN = ['', 'januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+function maand(ym) {
+  const [y, m] = ym.split('-');
+  return `${MAANDEN[Number(m)]} ${y}`;
 }
 
 function fmt(n) {

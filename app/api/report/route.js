@@ -7,6 +7,7 @@ import {
   documentsWithoutTransaction,
   allTransactions,
   itemStatusCounts,
+  vatByMonth,
 } from '../../../lib/db.js';
 
 export const runtime = 'nodejs';
@@ -20,12 +21,13 @@ export async function GET(req) {
     return json({ error: 'unauthorized' }, 401);
   }
 
-  const [items, noneNeeded, docsWithout, all, counts] = await Promise.all([
+  const [items, noneNeeded, docsWithout, all, counts, vat] = await Promise.all([
     openItems(),
     noneNeededItems(),
     documentsWithoutTransaction(),
     allTransactions(),
     itemStatusCounts(),
+    vatByMonth(),
   ]);
 
   return json(
@@ -34,6 +36,7 @@ export async function GET(req) {
       noneNeeded,
       docsWithout,
       all,
+      vat,
       counts: {
         openOut: counts.open_out,
         openIn: counts.open_in,
