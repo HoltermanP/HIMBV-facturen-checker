@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 // INTAKE_SECRET wordt door de gebruiker ingevuld en in localStorage bewaard.
 export default function Home() {
   const [secret, setSecret] = useState('');
+  const [registerOnly, setRegisterOnly] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [items, setItems] = useState([]); // { id, filename, status, vendor, amount, doc_date, error }
   const [dragOver, setDragOver] = useState(false);
@@ -40,6 +41,7 @@ export default function Home() {
 
     const form = new FormData();
     for (const f of files) form.append('file', f);
+    if (registerOnly) form.append('mode', 'register'); // alleen registreren, niet versturen
 
     try {
       const res = await fetch('/api/intake', {
@@ -154,6 +156,12 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Alleen registreren: voor facturen die al naar Basecone zijn gestuurd */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginTop: 14, fontSize: 13, color: '#5b6470' }}>
+          <input type="checkbox" checked={registerOnly} onChange={(e) => setRegisterOnly(e.target.checked)} />
+          Alleen registreren (al naar Basecone gestuurd — niet opnieuw versturen)
+        </label>
+
         {/* Verborgen inputs */}
         <input
           ref={cameraInput}
@@ -204,6 +212,7 @@ export default function Home() {
 
 function statusLabel(s) {
   if (s === 'sent') return 'verstuurd';
+  if (s === 'registered') return 'geregistreerd';
   if (s === 'skipped') return 'overgeslagen';
   if (s === 'error') return 'fout';
   return s;
@@ -222,6 +231,7 @@ const btnGhost = { ...btnBase, background: 'transparent', color: '#2563eb', padd
 function badge(status) {
   const map = {
     sent: { bg: '#dcfce7', fg: '#166534' },
+    registered: { bg: '#dbeafe', fg: '#1e40af' },
     skipped: { bg: '#fef9c3', fg: '#854d0e' },
     error: { bg: '#fee2e2', fg: '#991b1b' },
   };

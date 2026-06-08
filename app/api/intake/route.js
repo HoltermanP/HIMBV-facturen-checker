@@ -24,6 +24,9 @@ export async function POST(req) {
     return json({ error: 'geen bestanden in veld "file"' }, 400);
   }
 
+  // mode=register -> alleen OCR + registreren (niet opnieuw naar Basecone sturen).
+  const skipSend = form.get('mode') === 'register';
+
   const results = [];
   let anyFail = false;
 
@@ -48,6 +51,7 @@ export async function POST(req) {
         messageId: null,
         fromAddress: null,
         source: 'foto',
+        skipSend,
       });
       results.push(r);
     } catch (err) {
@@ -57,7 +61,8 @@ export async function POST(req) {
   }
 
   // 207 bij gedeeltelijk falen, anders 200.
-  const status = anyFail && results.some((r) => r.status === 'sent') ? 207 : anyFail ? 502 : 200;
+  const okStatuses = ['sent', 'registered'];
+  const status = anyFail && results.some((r) => okStatuses.includes(r.status)) ? 207 : anyFail ? 502 : 200;
   return json({ status: status === 200 ? 'ok' : 'partial', results }, status);
 }
 
