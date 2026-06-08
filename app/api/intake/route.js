@@ -1,0 +1,69 @@
+// Handmatige intake: foto vanaf iPhone of upload(s) vanaf laptop.
+// POST multipart/form-data met één of meer velden "file". Bearer-auth op INTAKE_SECRET.
+import { processAttachment, isProcessable } from '../../../lib/process.js';
+
+export const runtime = 'nodejs';
+
+export async function POST(req) {
+  // Auth: Bearer INTAKE_SECRET.
+  const auth = req.headers.get('authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!process.env.INTAKE_SECRET || token !== process.env.INTAKE_SECRET) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+
+  let form;
+  try {
+    form = await req.formData();
+  } catch {
+    return json({ error: 'verwacht multipart/form-data' }, 400);
+  }
+
+  const files = form.getAll('file').filter((f) => typeof f === 'object' && 'arrayBuffer' in f);
+  if (files.length === 0) {
+    return json({ error: 'geen bestanden in veld "file"' }, 400);
+  }
+
+  const results = [];
+  let anyFail = false;
+
+  for (const file of files) {
+    const filename = file.name || 'upload';
+    try {
+      const buf = Buffer.from(await file.arrayBuffer());
+      const contentType = file.type || 'application/octet-stream';
+
+      if (!isProcessable(contentType, buf.length)) {
+        anyFail = true;
+        results.push({ filename, status: 'skipped', reason: 'type/grootte', vendor: null, amount: null, doc_date: null });
+        continue;
+      }
+
+      // Handmatige upload heeft geen message_id -> altijd registreren.
+      const r = await processAttachment({
+        base64: buf.toString('base64'),
+        contentType,
+        filename,
+        note: null,
+        messageId: null,
+        fromAddress: null,
+        source: 'foto',
+      });
+      results.push(r);
+    } catch (err) {
+      anyFail = true;
+      results.push({ filename, status: 'error', error: String(err.message || err), vendor: null, amount: null, doc_date: null });
+    }
+  }
+
+  // 207 bij gedeeltelijk falen, anders 200.
+  const status = anyFail && results.some((r) => r.status === 'sent') ? 207 : anyFail ? 502 : 200;
+  return json({ status: status === 200 ? 'ok' : 'partial', results }, status);
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}

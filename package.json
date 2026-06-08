@@ -1,0 +1,20 @@
+{
+  "name": "himbv-facturen-logger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bonnen en facturen via OCR naar Basecone (Microsoft Graph) en registreren in Neon.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "imapflow": "^1.0.187",
+    "next": "14.2.35",
+    "nodemailer": "^6.9.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
