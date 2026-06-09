@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 
 // Volledigheidscontrole: bankafschrift uploaden, matchen, afvinken en overzicht.
 export default function Check() {
@@ -217,7 +217,7 @@ export default function Check() {
         <OpenTab report={report} resolve={resolve} pendingId={pendingId} linkDoc={linkDoc} del={del} />
       )}
       {report && tab === 'all' && <AllTab rows={report.all || []} unlinkTx={unlinkTx} del={del} />}
-      {report && tab === 'vat' && <VatTab months={report.vat || []} />}
+      {report && tab === 'vat' && <VatTab vat={report.vat} />}
     </main>
   );
 }
@@ -481,25 +481,59 @@ function bonBadge(t) {
 
 // --- Tab: BTW per maand ---------------------------------------------------
 
-function VatTab({ months }) {
+function VatTab({ vat }) {
+  const months = vat?.months || [];
+  const quarters = vat?.quarters || [];
+  const [open, setOpen] = useState({});
+
   if (!months.length) {
     return <div className="empty">Nog geen boekingen om BTW over te berekenen.</div>;
   }
+  const toggle = (m) => setOpen((o) => ({ ...o, [m]: !o[m] }));
   const tot = months.reduce(
     (a, m) => ({ output: a.output + m.output, input: a.input + m.input, reserve: a.reserve + m.reserve, estimated: a.estimated + m.estimated }),
     { output: 0, input: 0, reserve: 0, estimated: 0 },
   );
+
   return (
     <>
       <p className="subtitle" style={{ marginTop: 0, marginBottom: 12 }}>
-        Per maand op basis van de boekingen. Echte BTW van de gekoppelde bon waar aanwezig,
-        anders een <b>21%-schatting</b>; posten “geen document nodig” tellen als 0%.
+        Op basis van de boekingen. Echte BTW van de gekoppelde bon waar aanwezig, anders een{' '}
+        <b>21%-schatting</b>; posten “geen document nodig” tellen als 0%. Klik een maand uit
+        om alle posten te zien.
       </p>
+
+      <h2 className="section-title" style={{ marginTop: 4 }}>Per kwartaal</h2>
       <div className="table-wrap">
         <table className="tbl">
-          <colgroup>
-            <col style={{ width: 130 }} /><col /><col /><col /><col style={{ width: 150 }} />
-          </colgroup>
+          <colgroup><col style={{ width: 140 }} /><col /><col /><col /><col style={{ width: 150 }} /></colgroup>
+          <thead>
+            <tr>
+              <th>Kwartaal</th>
+              <th style={{ textAlign: 'right' }}>Af te dragen</th>
+              <th style={{ textAlign: 'right' }}>Terug te vorderen</th>
+              <th style={{ textAlign: 'right' }}>Te reserveren</th>
+              <th style={{ textAlign: 'right' }}>waarvan geschat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quarters.map((q) => (
+              <tr key={q.quarter}>
+                <td className="nowrap"><b>{q.quarter}</b></td>
+                <td className="num-cell">€ {fmt(q.output)}</td>
+                <td className="num-cell">€ {fmt(q.input)}</td>
+                <td className="num-cell" style={{ color: q.reserve >= 0 ? '#b54708' : '#027a48' }}><b>€ {fmt(q.reserve)}</b></td>
+                <td className="num-cell muted">{q.estimated ? `€ ${fmt(q.estimated)}` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 className="section-title">Per maand <span className="muted" style={{ fontWeight: 400, fontSize: 14 }}>(klik om uit te klappen)</span></h2>
+      <div className="table-wrap">
+        <table className="tbl">
+          <colgroup><col style={{ width: 200 }} /><col /><col /><col /><col style={{ width: 150 }} /></colgroup>
           <thead>
             <tr>
               <th>Maand</th>
@@ -511,13 +545,22 @@ function VatTab({ months }) {
           </thead>
           <tbody>
             {months.map((m) => (
-              <tr key={m.month}>
-                <td className="nowrap"><b>{maand(m.month)}</b></td>
-                <td className="num-cell">€ {fmt(m.output)}</td>
-                <td className="num-cell">€ {fmt(m.input)}</td>
-                <td className="num-cell" style={{ color: m.reserve >= 0 ? '#b54708' : '#027a48' }}>€ {fmt(m.reserve)}</td>
-                <td className="num-cell muted">{m.estimated ? `€ ${fmt(m.estimated)}` : '—'}</td>
-              </tr>
+              <Fragment key={m.month}>
+                <tr onClick={() => toggle(m.month)} style={{ cursor: 'pointer' }}>
+                  <td className="nowrap"><span className="muted">{open[m.month] ? '▾' : '▸'}</span> <b>{maand(m.month)}</b></td>
+                  <td className="num-cell">€ {fmt(m.output)}</td>
+                  <td className="num-cell">€ {fmt(m.input)}</td>
+                  <td className="num-cell" style={{ color: m.reserve >= 0 ? '#b54708' : '#027a48' }}>€ {fmt(m.reserve)}</td>
+                  <td className="num-cell muted">{m.estimated ? `€ ${fmt(m.estimated)}` : '—'}</td>
+                </tr>
+                {open[m.month] && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: 0, background: '#fafbfc' }}>
+                      <MonthDetail rows={m.rows} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             <tr style={{ borderTop: '2px solid #e5e7eb' }}>
               <td className="nowrap"><b>Totaal</b></td>
@@ -534,6 +577,43 @@ function VatTab({ months }) {
         kleiner het geschatte deel en hoe nauwkeuriger het bedrag.
       </div>
     </>
+  );
+}
+
+// Detailregels (alle posten) onder een uitgeklapte maand.
+function MonthDetail({ rows }) {
+  return (
+    <table className="tbl" style={{ background: 'transparent' }}>
+      <colgroup><col style={{ width: 110 }} /><col style={{ width: 120 }} /><col style={{ width: '26%' }} /><col /><col style={{ width: 230 }} /></colgroup>
+      <thead>
+        <tr>
+          <th style={{ paddingLeft: 28 }}>Datum</th>
+          <th style={{ textAlign: 'right' }}>Bedrag</th>
+          <th>Tegenpartij</th><th>Omschrijving</th><th style={{ textAlign: 'right' }}>BTW</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const out = r.direction === 'output';
+          const badge = r.source === 'bon' ? 'green' : r.source === 'schatting' ? 'amber' : 'gray';
+          const label = r.source === 'bon' ? 'uit bon' : r.source === 'schatting' ? '21% schatting' : 'geen BTW';
+          return (
+            <tr key={r.id}>
+              <td className="nowrap" style={{ paddingLeft: 28 }}>{dt(r.tx_date)}</td>
+              <td className={`num-cell ${r.amount < 0 ? 'amount-out' : 'amount-in'}`}>{r.amount < 0 ? '−' : '+'} € {fmt(Math.abs(r.amount))}</td>
+              <td className="wrap">{r.counterparty || <span className="muted">—</span>}</td>
+              <td className="wrap">{r.description || <span className="muted">—</span>}</td>
+              <td style={{ textAlign: 'right' }}>
+                <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>€ {fmt(r.vat)} · {out ? 'verkoop' : 'inkoop'}</span>
+                  <span className={`badge ${badge}`}>{label}</span>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
