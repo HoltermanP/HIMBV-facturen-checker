@@ -41,7 +41,7 @@ export async function GET(req) {
       // Idempotentiesleutel per bijlage: stabiel over cron-runs heen.
       const messageId = `${msg.internetMessageId || msg.uid}#${att.id}`;
 
-      if (!isProcessable(att.contentType, att.size)) {
+      if (!isProcessable(att.contentType, att.size, filename)) {
         skipped++;
         detail.push({ filename, messageId, status: 'skipped', reason: 'type/grootte' });
         continue;

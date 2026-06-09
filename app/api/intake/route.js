@@ -1,6 +1,6 @@
 // Handmatige intake: foto vanaf iPhone of upload(s) vanaf laptop.
 // POST multipart/form-data met één of meer velden "file". Bearer-auth op INTAKE_SECRET.
-import { processAttachment, isProcessable } from '../../../lib/process.js';
+import { processAttachment, processableReason } from '../../../lib/process.js';
 import { runMatching } from '../../../lib/match.js';
 import { classifyByRules } from '../../../lib/db.js';
 
@@ -39,9 +39,10 @@ export async function POST(req) {
       const buf = Buffer.from(await file.arrayBuffer());
       const contentType = file.type || 'application/octet-stream';
 
-      if (!isProcessable(contentType, buf.length)) {
+      const reason = processableReason(contentType, buf.length, filename);
+      if (reason) {
         anyFail = true;
-        results.push({ filename, status: 'skipped', reason: 'type/grootte', vendor: null, amount: null, doc_date: null });
+        results.push({ filename, status: 'skipped', reason, vendor: null, amount: null, doc_date: null });
         continue;
       }
 
