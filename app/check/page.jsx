@@ -122,6 +122,24 @@ export default function Check() {
     }
   }
 
+  // Een boeking of bon verwijderen (met bevestiging).
+  async function del(kind, id, label) {
+    if (!window.confirm(`Definitief verwijderen?\n\n${label}`)) return;
+    try {
+      const res = await fetch('/api/delete', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+        body: JSON.stringify(kind === 'tx' ? { txId: id } : { docId: id }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Verwijderen faalde (${res.status})`);
+      } else await loadReport();
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }
+
   const c = report?.counts;
 
   return (
@@ -196,9 +214,9 @@ export default function Check() {
       )}
 
       {report && tab === 'open' && (
-        <OpenTab report={report} resolve={resolve} pendingId={pendingId} linkDoc={linkDoc} />
+        <OpenTab report={report} resolve={resolve} pendingId={pendingId} linkDoc={linkDoc} del={del} />
       )}
-      {report && tab === 'all' && <AllTab rows={report.all || []} unlinkTx={unlinkTx} />}
+      {report && tab === 'all' && <AllTab rows={report.all || []} unlinkTx={unlinkTx} del={del} />}
       {report && tab === 'vat' && <VatTab months={report.vat || []} />}
     </main>
   );
@@ -206,7 +224,7 @@ export default function Check() {
 
 // --- Tab: openstaande uitgaven + terugdraai-sectie ------------------------
 
-function OpenTab({ report, resolve, pendingId, linkDoc }) {
+function OpenTab({ report, resolve, pendingId, linkDoc, del }) {
   const items = report.items || [];
   const noneNeeded = report.noneNeeded || [];
   const docsWithout = report.docsWithout || [];
@@ -261,9 +279,14 @@ function OpenTab({ report, resolve, pendingId, linkDoc }) {
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           <span className={`badge ${isOut ? 'amber' : 'purple'}`}>{isOut ? 'inkoopbon nodig' : 'verkoopfactuur nodig'}</span>
-                          <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'none_needed')}>
-                            ✓ Geen {docWord} nodig
-                          </button>
+                          <div className="actions">
+                            <button className="btn btn-outline btn-sm" disabled={wait} onClick={() => resolve(t.id, 'none_needed')}>
+                              ✓ Geen {docWord} nodig
+                            </button>
+                            <button className="btn btn-danger-ghost btn-sm" onClick={() => del('tx', t.id, `${dt(t.tx_date)} · € ${fmt(Math.abs(Number(t.amount)))} · ${t.counterparty || t.description || ''}`)}>
+                              Verwijder
+                            </button>
+                          </div>
                         </div>
                       )}
                     </td>
@@ -299,9 +322,14 @@ function OpenTab({ report, resolve, pendingId, linkDoc }) {
                       <td className="wrap">{t.counterparty || <span className="muted">—</span>}</td>
                       <td className="wrap">{t.description || <span className="muted">—</span>}</td>
                       <td>
-                        <button className="btn btn-danger-ghost btn-sm" disabled={pendingId === t.id} onClick={() => resolve(t.id, 'open')}>
-                          Terugzetten
-                        </button>
+                        <div className="actions">
+                          <button className="btn btn-outline btn-sm" disabled={pendingId === t.id} onClick={() => resolve(t.id, 'open')}>
+                            Terugzetten
+                          </button>
+                          <button className="btn btn-danger-ghost btn-sm" onClick={() => del('tx', t.id, `${dt(t.tx_date)} · € ${fmt(Math.abs(Number(t.amount)))} · ${t.counterparty || t.description || ''}`)}>
+                            Verwijder
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -332,7 +360,12 @@ function OpenTab({ report, resolve, pendingId, linkDoc }) {
                   <td className="num-cell">{d.amount != null ? `€ ${fmt(Number(d.amount))}` : <span className="muted">—</span>}</td>
                   <td className="wrap">{d.vendor || <span className="muted">—</span>}</td>
                   <td className="wrap">{d.attachment_name || <span className="muted">—</span>}</td>
-                  <td><LinkPicker doc={d} candidates={items} linkDoc={linkDoc} /></td>
+                  <td>
+                    <LinkPicker doc={d} candidates={items} linkDoc={linkDoc} />
+                    <button className="btn btn-danger-ghost btn-sm" style={{ marginTop: 6 }} onClick={() => del('doc', d.id, `Bon: ${d.attachment_name || d.vendor || d.id}`)}>
+                      Verwijder bon
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -391,7 +424,7 @@ function LinkPicker({ doc, candidates, linkDoc }) {
 
 // --- Tab: alle boekingen --------------------------------------------------
 
-function AllTab({ rows, unlinkTx }) {
+function AllTab({ rows, unlinkTx, del }) {
   return (
     <div className="table-wrap">
       <table className="tbl">
@@ -420,9 +453,12 @@ function AllTab({ rows, unlinkTx }) {
                     {t.matched_doc_id && diff != null && diff !== 0 && (
                       <span className="badge amber">verschil € {fmt(Math.abs(diff))} weggeschreven</span>
                     )}
-                    {t.matched_doc_id && (
-                      <button className="btn btn-danger-ghost btn-sm" onClick={() => unlinkTx(t.id)}>Ontkoppelen</button>
-                    )}
+                    <div className="actions">
+                      {t.matched_doc_id && (
+                        <button className="btn btn-outline btn-sm" onClick={() => unlinkTx(t.id)}>Ontkoppelen</button>
+                      )}
+                      <button className="btn btn-danger-ghost btn-sm" onClick={() => del('tx', t.id, `${dt(t.tx_date)} · € ${fmt(Math.abs(amt))} · ${t.counterparty || t.description || ''}`)}>Verwijder</button>
+                    </div>
                   </div>
                 </td>
               </tr>
