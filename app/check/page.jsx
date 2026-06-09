@@ -210,7 +210,7 @@ function OpenTab({ report, resolve, pendingId }) {
                 const docWord = isOut ? 'bon' : 'factuur'; // inkoopbon vs uitgaande factuur
                 return (
                   <tr key={t.id} className={sug ? 'row-suggested' : ''}>
-                    <td className="nowrap">{t.tx_date}</td>
+                    <td className="nowrap">{dt(t.tx_date)}</td>
                     <td className={`num-cell ${isOut ? 'amount-out' : 'amount-in'}`}>
                       {isOut ? '−' : '+'} € {fmt(Math.abs(Number(t.amount)))}
                     </td>
@@ -259,7 +259,7 @@ function OpenTab({ report, resolve, pendingId }) {
                   const isOut = Number(t.amount) < 0;
                   return (
                     <tr key={t.id}>
-                      <td className="nowrap">{t.tx_date}</td>
+                      <td className="nowrap">{dt(t.tx_date)}</td>
                       <td className={`num-cell ${isOut ? 'amount-out' : 'amount-in'}`}>
                         {isOut ? '−' : '+'} € {fmt(Math.abs(Number(t.amount)))}
                       </td>
@@ -295,7 +295,7 @@ function OpenTab({ report, resolve, pendingId }) {
             <tbody>
               {docsWithout.map((d) => (
                 <tr key={d.id}>
-                  <td className="nowrap">{d.doc_date || <span className="muted">—</span>}</td>
+                  <td className="nowrap">{dt(d.doc_date)}</td>
                   <td className="num-cell">{d.amount != null ? `€ ${fmt(Number(d.amount))}` : <span className="muted">—</span>}</td>
                   <td className="wrap">{d.vendor || <span className="muted">—</span>}</td>
                   <td className="wrap">{d.attachment_name || <span className="muted">—</span>}</td>
@@ -327,7 +327,7 @@ function AllTab({ rows }) {
             const amt = Number(t.amount);
             return (
               <tr key={t.id}>
-                <td className="nowrap">{t.tx_date}</td>
+                <td className="nowrap">{dt(t.tx_date)}</td>
                 <td className={`num-cell ${amt < 0 ? 'amount-out' : 'amount-in'}`}>
                   {amt < 0 ? '−' : '+'} € {fmt(Math.abs(amt))}
                 </td>
@@ -418,4 +418,11 @@ function maand(ym) {
 
 function fmt(n) {
   return Number(n).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Datum (ISO of YYYY-MM-DD) -> dd-mm-jjjj, zonder tijdzone-gedoe.
+function dt(s) {
+  if (!s) return '—';
+  const m = String(s).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s);
 }
