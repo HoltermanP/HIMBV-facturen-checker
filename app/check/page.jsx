@@ -89,6 +89,39 @@ export default function Check() {
     }
   }
 
+  // Handmatig koppelen / ontkoppelen (met verschil wegschrijven).
+  async function linkDoc(docId, txId) {
+    try {
+      const res = await fetch('/api/transactions/link', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ docId, txId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Koppelen faalde (${res.status})`);
+      } else await loadReport();
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }
+
+  async function unlinkTx(txId) {
+    try {
+      const res = await fetch('/api/transactions/link', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ unlink: true, txId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Ontkoppelen faalde (${res.status})`);
+      } else await loadReport();
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }
+
   const c = report?.counts;
 
   return (
@@ -163,9 +196,9 @@ export default function Check() {
       )}
 
       {report && tab === 'open' && (
-        <OpenTab report={report} resolve={resolve} pendingId={pendingId} />
+        <OpenTab report={report} resolve={resolve} pendingId={pendingId} linkDoc={linkDoc} />
       )}
-      {report && tab === 'all' && <AllTab rows={report.all || []} />}
+      {report && tab === 'all' && <AllTab rows={report.all || []} unlinkTx={unlinkTx} />}
       {report && tab === 'vat' && <VatTab months={report.vat || []} />}
     </main>
   );
@@ -173,7 +206,7 @@ export default function Check() {
 
 // --- Tab: openstaande uitgaven + terugdraai-sectie ------------------------
 
-function OpenTab({ report, resolve, pendingId }) {
+function OpenTab({ report, resolve, pendingId, linkDoc }) {
   const items = report.items || [];
   const noneNeeded = report.noneNeeded || [];
   const docsWithout = report.docsWithout || [];
@@ -287,10 +320,10 @@ function OpenTab({ report, resolve, pendingId }) {
           <table className="tbl">
             <colgroup>
               <col style={{ width: 104 }} /><col style={{ width: 116 }} />
-              <col style={{ width: '24%' }} /><col />
+              <col style={{ width: '20%' }} /><col /><col style={{ width: 320 }} />
             </colgroup>
             <thead>
-              <tr><th>Datum</th><th style={{ textAlign: 'right' }}>Bedrag</th><th>Leverancier</th><th>Bestand</th></tr>
+              <tr><th>Datum</th><th style={{ textAlign: 'right' }}>Bedrag</th><th>Leverancier</th><th>Bestand</th><th>Koppelen aan boeking</th></tr>
             </thead>
             <tbody>
               {docsWithout.map((d) => (
@@ -299,6 +332,7 @@ function OpenTab({ report, resolve, pendingId }) {
                   <td className="num-cell">{d.amount != null ? `€ ${fmt(Number(d.amount))}` : <span className="muted">—</span>}</td>
                   <td className="wrap">{d.vendor || <span className="muted">—</span>}</td>
                   <td className="wrap">{d.attachment_name || <span className="muted">—</span>}</td>
+                  <td><LinkPicker doc={d} candidates={items} linkDoc={linkDoc} /></td>
                 </tr>
               ))}
             </tbody>
@@ -309,15 +343,61 @@ function OpenTab({ report, resolve, pendingId }) {
   );
 }
 
+// Kies handmatig een banktransactie om aan deze bon te koppelen; toont het verschil.
+function LinkPicker({ doc, candidates, linkDoc }) {
+  const [txId, setTxId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const docAmt = Number(doc.amount);
+
+  // Kandidaten sorteren op bedrag-nabijheid t.o.v. de bon.
+  const sorted = [...candidates].sort(
+    (a, b) => Math.abs(Math.abs(Number(a.amount)) - docAmt) - Math.abs(Math.abs(Number(b.amount)) - docAmt),
+  );
+  const chosen = sorted.find((t) => String(t.id) === txId);
+  const diff = chosen ? Math.round((Math.abs(Number(chosen.amount)) - docAmt) * 100) / 100 : null;
+
+  async function go() {
+    if (!chosen) return;
+    setBusy(true);
+    await linkDoc(doc.id, chosen.id);
+    setBusy(false);
+  }
+
+  if (!candidates.length) return <span className="muted">geen openstaande boekingen</span>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <select className="select" value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy}>
+        <option value="">— kies boeking —</option>
+        {sorted.slice(0, 12).map((t) => {
+          const a = Number(t.amount);
+          return (
+            <option key={t.id} value={t.id}>
+              {dt(t.tx_date)} · {a < 0 ? '−' : '+'}€{fmt(Math.abs(a))} · {(t.counterparty || t.description || '').slice(0, 28)}
+            </option>
+          );
+        })}
+      </select>
+      <div className="actions" style={{ alignItems: 'center' }}>
+        <button className="btn btn-primary btn-sm" disabled={!chosen || busy} onClick={go}>Koppel</button>
+        {diff != null && diff !== 0 && (
+          <span className="badge amber">verschil € {fmt(Math.abs(diff))} wegschrijven</span>
+        )}
+        {diff === 0 && <span className="badge green">exact</span>}
+      </div>
+    </div>
+  );
+}
+
 // --- Tab: alle boekingen --------------------------------------------------
 
-function AllTab({ rows }) {
+function AllTab({ rows, unlinkTx }) {
   return (
     <div className="table-wrap">
       <table className="tbl">
         <colgroup>
           <col style={{ width: 104 }} /><col style={{ width: 120 }} />
-          <col style={{ width: '26%' }} /><col /><col style={{ width: 180 }} />
+          <col style={{ width: '24%' }} /><col /><col style={{ width: 240 }} />
         </colgroup>
         <thead>
           <tr><th>Datum</th><th style={{ textAlign: 'right' }}>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Bon</th></tr>
@@ -325,6 +405,7 @@ function AllTab({ rows }) {
         <tbody>
           {rows.map((t) => {
             const amt = Number(t.amount);
+            const diff = t.match_diff != null ? Number(t.match_diff) : null;
             return (
               <tr key={t.id}>
                 <td className="nowrap">{dt(t.tx_date)}</td>
@@ -333,7 +414,17 @@ function AllTab({ rows }) {
                 </td>
                 <td className="wrap">{t.counterparty || <span className="muted">—</span>}</td>
                 <td className="wrap">{t.description || <span className="muted">—</span>}</td>
-                <td>{bonBadge(t)}</td>
+                <td>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {bonBadge(t)}
+                    {t.matched_doc_id && diff != null && diff !== 0 && (
+                      <span className="badge amber">verschil € {fmt(Math.abs(diff))} weggeschreven</span>
+                    )}
+                    {t.matched_doc_id && (
+                      <button className="btn btn-danger-ghost btn-sm" onClick={() => unlinkTx(t.id)}>Ontkoppelen</button>
+                    )}
+                  </div>
+                </td>
               </tr>
             );
           })}

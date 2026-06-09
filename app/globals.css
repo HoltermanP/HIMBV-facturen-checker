@@ -102,6 +102,7 @@ table.tbl tbody tr:hover { background: #fafbfc; }
 .note { background: var(--blue-bg); color: var(--blue-fg); border-radius: 10px; padding: 11px 14px; margin-top: 14px; font-size: 14px; }
 .errbox { background: #fef3f2; color: #b42318; border-radius: 10px; padding: 11px 14px; margin-top: 14px; font-size: 14px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; background: #fff; max-width: 100%; }
 .muted { color: var(--muted); }
 .amount-out { color: #b42318; }
 .amount-in { color: #027a48; }
